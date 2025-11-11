@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate API Key</title>
+    <style>
+        body {
+            background-color: #f3e8ff;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            color: #6b21a8;
+            margin-bottom: 20px;
+        }
+
+        textarea {
+            width: 300px;
+            height: 100px;
+            border: 2px solid #c084fc;
+            border-radius: 10px;
+            background-color: #faf5ff;
+            color: #4b006e;
+            font-size: 16px;
+            padding: 10px;
+            resize: none;
+            outline: none;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background-color: #c084fc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #a855f7;
+        }
+    </style>
+</head>
+<body>
+    <h1>Generate API Key</h1>
+    <textarea id="apikey" readonly placeholder="API Key akan muncul di sini..."></textarea>
+    <button id="generateBtn">Create API Key</button>
+
+    <!-- Hubungkan ke file JS -->
+    <script src="index.js"></script>
+</body>
+</html>
