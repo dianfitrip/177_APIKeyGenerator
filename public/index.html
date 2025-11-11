@@ -19,19 +19,20 @@
     .container {
       background-color: #f8f5ff; /* Latar belakang putih keunguan */
       border-radius: 20px;
-      box-shadow: 0 4px 12px rgba(128, 90, 213, 0.25); /* Bayangan ungu lembut */
+      box-shadow: 0 4px 12px rgba(128, 90, 213, 0.25);
       padding: 30px;
       width: 350px;
       text-align: center;
+      position: relative;
     }
 
     h1 {
-      color: #7e57c2; /* Judul ungu pastel */
+      color: #7e57c2;
       margin-bottom: 20px;
     }
 
     button {
-      background-color: #b388ff; /* Ungu pastel sedang */
+      background-color: #b388ff;
       color: white;
       border: none;
       border-radius: 12px;
@@ -42,17 +43,21 @@
     }
 
     button:hover {
-      background-color: #9c6bff; /* Ungu sedikit lebih gelap saat hover */
+      background-color: #9c6bff;
       transform: scale(1.05);
+    }
+
+    .textarea-wrapper {
+      position: relative;
+      margin-top: 20px;
     }
 
     textarea {
       width: 100%;
       height: 120px;
-      margin-top: 20px;
-      border: 2px solid #c4b5fd; /* Border ungu muda */
+      border: 2px solid #c4b5fd;
       border-radius: 10px;
-      padding: 10px;
+      padding: 10px 10px 40px 10px; /* tambah ruang bawah untuk tombol */
       font-size: 14px;
       resize: none;
       background-color: #ffffff;
@@ -61,25 +66,87 @@
     }
 
     textarea::placeholder {
-      color: #a78bfa; /* Placeholder ungu pastel */
+      color: #a78bfa;
+    }
+
+    #btnCopy {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background-color: #b388ff;
+      border: none;
+      color: white;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s;
+    }
+
+    #btnCopy:hover {
+      background-color: #9c6bff;
+      transform: scale(1.05);
+    }
+
+    .copy-message {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #7e57c2;
+      height: 16px;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Buat API Key</h1>
-    <button onclick="buatApiKey()">Create API Key</button>
-    <textarea id="apikey" readonly placeholder="API Key akan muncul di sini..."></textarea>
+    <button id="btnCreate">Create API Key</button>
+
+    <div class="textarea-wrapper">
+      <textarea id="apikey" readonly placeholder="API Key akan muncul di sini..."></textarea>
+      <button id="btnCopy">Copy</button>
+    </div>
+
+    <div class="copy-message" id="copyMessage"></div>
   </div>
 
   <script>
-    function buatApiKey() {
-      const randomPart = () => Math.random().toString(36).substring(2, 10).toUpperCase();
-      const apiKey = `API-${randomPart()}-${randomPart()}-${randomPart()}`;
-      document.getElementById('apikey').value = apiKey;
-    }
+    const textarea = document.getElementById('apikey');
+    const btnCreate = document.getElementById('btnCreate');
+    const btnCopy = document.getElementById('btnCopy');
+    const copyMessage = document.getElementById('copyMessage');
+
+    // Fungsi membuat API Key dari backend
+    btnCreate.addEventListener('click', async () => {
+      textarea.value = "Memproses...";
+      copyMessage.textContent = "";
+
+      try {
+        const response = await fetch('/create', { method: 'POST' });
+        const data = await response.json();
+        textarea.value = data.apiKey || "Gagal membuat API Key!";
+      } catch (error) {
+        textarea.value = "Terjadi kesalahan saat membuat API Key.";
+        console.error(error);
+      }
+    });
+
+    // Fungsi salin ke clipboard
+    btnCopy.addEventListener('click', async () => {
+      const apiKey = textarea.value.trim();
+      if (!apiKey || apiKey === "Memproses..." || apiKey.startsWith("Terjadi") || apiKey.startsWith("Gagal")) {
+        copyMessage.textContent = "Belum ada API Key untuk disalin!";
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(apiKey);
+        copyMessage.textContent = "API Key berhasil disalin!";
+        setTimeout(() => copyMessage.textContent = "", 2000);
+      } catch (err) {
+        copyMessage.textContent = "Gagal menyalin ke clipboard.";
+        console.error(err);
+      }
+    });
   </script>
 </body>
 </html>
-
-
