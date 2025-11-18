@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pembuat API Key</title>
+  <title>Registrasi User & API Key</title>
   <style>
     body {
       font-family: 'Poppins', sans-serif;
-      background-color: #f3e8ff; /* Ungu pastel lembut */
+      background-color: #f3e8ff;
       color: #4a4a4a;
       display: flex;
       justify-content: center;
@@ -15,22 +15,18 @@
       height: 100vh;
       margin: 0;
     }
-
     .container {
-      background-color: #f8f5ff; /* Latar belakang putih keunguan */
+      background-color: #f8f5ff;
       border-radius: 20px;
       box-shadow: 0 4px 12px rgba(128, 90, 213, 0.25);
       padding: 30px;
-      width: 350px;
+      width: 400px;
       text-align: center;
-      position: relative;
     }
-
     h1 {
       color: #7e57c2;
       margin-bottom: 20px;
     }
-
     button {
       background-color: #b388ff;
       color: white;
@@ -40,111 +36,172 @@
       font-size: 16px;
       cursor: pointer;
       transition: background-color 0.3s ease, transform 0.2s;
+      margin-top: 10px;
     }
-
     button:hover {
       background-color: #9c6bff;
       transform: scale(1.05);
     }
-
+    button:disabled {
+      background-color: #d1c4e9;
+      cursor: not-allowed;
+    }
     .textarea-wrapper {
       position: relative;
       margin-top: 20px;
     }
-
     textarea {
       width: 100%;
-      height: 120px;
+      height: 100px;
       border: 2px solid #c4b5fd;
       border-radius: 10px;
-      padding: 10px 10px 40px 10px; /* tambah ruang bawah untuk tombol */
+      padding: 10px;
       font-size: 14px;
       resize: none;
-      background-color: #ffffff;
-      color: #4a4a4a;
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+      box-sizing: border-box;
     }
-
-    textarea::placeholder {
-      color: #a78bfa;
+    .form-group {
+      margin-top: 15px;
+      text-align: left;
     }
-
-    #btnCopy {
-      position: absolute;
-      bottom: 8px;
-      right: 8px;
-      background-color: #b388ff;
-      border: none;
-      color: white;
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      color: #5e35b1;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #c4b5fd;
       border-radius: 8px;
-      padding: 6px 12px;
-      font-size: 13px;
-      cursor: pointer;
-      transition: background-color 0.3s ease, transform 0.2s;
+      box-sizing: border-box;
     }
-
-    #btnCopy:hover {
-      background-color: #9c6bff;
-      transform: scale(1.05);
+    .message {
+      margin-top: 15px;
+      font-size: 14px;
+      height: 20px;
     }
-
-    .copy-message {
-      margin-top: 10px;
-      font-size: 13px;
-      color: #7e57c2;
-      height: 16px;
+    .message.success {
+      color: green;
+    }
+    .message.error {
+      color: red;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Buat API Key</h1>
+    <h1>Registrasi User</h1>
+    <p>Langkah 1: Buat API Key Anda</p>
     <button id="btnCreate">Create API Key</button>
 
     <div class="textarea-wrapper">
       <textarea id="apikey" readonly placeholder="API Key akan muncul di sini..."></textarea>
-      <button id="btnCopy">Copy</button>
     </div>
 
-    <div class="copy-message" id="copyMessage"></div>
+    <div id="registration-form" style="display: none;">
+      <p>Langkah 2: Isi Data Diri Anda</p>
+      <div class="form-group">
+        <label for="firstName">First Name</label>
+        <input type="text" id="firstName" name="firstName" required>
+      </div>
+      <div class="form-group">
+        <label for="lastName">Last Name</label>
+        <input type="text" id="lastName" name="lastName" required>
+      </div>
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required>
+      </div>
+      <button id="btnSave">Save Data</button>
+    </div>
+
+    <div class="message" id="message"></div>
   </div>
 
   <script>
     const textarea = document.getElementById('apikey');
     const btnCreate = document.getElementById('btnCreate');
-    const btnCopy = document.getElementById('btnCopy');
-    const copyMessage = document.getElementById('copyMessage');
+    const btnSave = document.getElementById('btnSave');
+    const registrationForm = document.getElementById('registration-form');
+    const messageEl = document.getElementById('message');
+
+    let currentApiKeyId = null; // Untuk menyimpan ID API key
 
     // Fungsi membuat API Key dari backend
     btnCreate.addEventListener('click', async () => {
       textarea.value = "Memproses...";
-      copyMessage.textContent = "";
+      messageEl.textContent = "";
+      btnCreate.disabled = true;
 
       try {
-        const response = await fetch('/create', { method: 'POST' });
+        const response = await fetch('/generate-key', { method: 'POST' });
         const data = await response.json();
-        textarea.value = data.apiKey || "Gagal membuat API Key!";
+
+        if (response.ok) {
+          textarea.value = data.apiKey;
+          currentApiKeyId = data.apiKeyId; // Simpan ID
+          registrationForm.style.display = 'block'; // Tampilkan form data diri
+          messageEl.textContent = "Silakan isi data diri Anda.";
+        } else {
+          textarea.value = "Gagal membuat API Key!";
+          messageEl.textContent = data.message || "Gagal membuat API Key!";
+          btnCreate.disabled = false;
+        }
       } catch (error) {
-        textarea.value = "Terjadi kesalahan saat membuat API Key.";
+        textarea.value = "Terjadi kesalahan.";
+        messageEl.textContent = "Terjadi kesalahan koneksi.";
+        btnCreate.disabled = false;
         console.error(error);
       }
     });
 
-    // Fungsi salin ke clipboard
-    btnCopy.addEventListener('click', async () => {
-      const apiKey = textarea.value.trim();
-      if (!apiKey || apiKey === "Memproses..." || apiKey.startsWith("Terjadi") || apiKey.startsWith("Gagal")) {
-        copyMessage.textContent = "Belum ada API Key untuk disalin!";
+    // Fungsi menyimpan data user
+    btnSave.addEventListener('click', async () => {
+      const firstName = document.getElementById('firstName').value;
+      const lastName = document.getElementById('lastName').value;
+      const email = document.getElementById('email').value;
+
+      if (!firstName || !lastName || !email || !currentApiKeyId) {
+        messageEl.className = 'message error';
+        messageEl.textContent = "Harap isi semua data dan buat API Key dahulu.";
         return;
       }
 
+      btnSave.disabled = true;
+      btnSave.textContent = "Menyimpan...";
+
       try {
-        await navigator.clipboard.writeText(apiKey);
-        copyMessage.textContent = "API Key berhasil disalin!";
-        setTimeout(() => copyMessage.textContent = "", 2000);
-      } catch (err) {
-        copyMessage.textContent = "Gagal menyalin ke clipboard.";
-        console.error(err);
+        const response = await fetch('/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            firstName,
+            lastName,
+            email,
+            apiKeyId: currentApiKeyId
+          }),
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          messageEl.className = 'message success';
+          messageEl.textContent = data.message;
+          registrationForm.style.display = 'none'; // Sembunyikan form
+        } else {
+          messageEl.className = 'message error';
+          messageEl.textContent = data.message || "Gagal mendaftar.";
+          btnSave.disabled = false;
+          btnSave.textContent = "Save Data";
+        }
+      } catch (error) {
+        messageEl.className = 'message error';
+        messageEl.textContent = "Terjadi kesalahan koneksi.";
+        btnSave.disabled = false;
+        btnSave.textContent = "Save Data";
+        console.error(error);
       }
     });
   </script>

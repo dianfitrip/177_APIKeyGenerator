@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Daftar User</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f4f7f6;
+      margin: 0;
+      padding: 20px;
+    }
+    nav {
+      background-color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    nav h1 {
+      margin: 0;
+      color: #333;
+    }
+    nav a {
+      color: #d9534f;
+      text-decoration: none;
+      background-color: #fbecec;
+      padding: 8px 12px;
+      border-radius: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 12px 15px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+    th {
+      background-color: #6c5ce7;
+      color: white;
+    }
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    .status-active {
+      color: green;
+      font-weight: bold;
+    }
+    .status-expired {
+      color: red;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <h1>Dashboard Admin</h1>
+    <a href="/admin/logout">Logout</a>
+  </nav>
+
+  <h2>Daftar User Terdaftar</h2>
+  <table id="user-table">
+    <thead>
+      <tr>
+        <th>First Name</th>
+        <th>Last Name</th>
+        <th>Email</th>
+        <th>API Key</th>
+        <th>Tanggal Kadaluarsa</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="user-table-body">
+      <tr>
+        <td colspan="6" style="text-align: center;">Memuat data...</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <script>
+    window.addEventListener('load', async () => {
+      const tbody = document.getElementById('user-table-body');
+      
+      try {
+        const response = await fetch('/admin/users');
+        
+        if (!response.ok) {
+          // Jika session habis atau tidak valid, server akan redirect
+          // dan fetch akan gagal, atau server kirim 401/403
+          // Cek ini akan ditangani oleh middleware, tapi kita bisa redirect
+          if (response.status === 401 || response.status === 403) {
+            window.location.href = '/admin-login.html';
+            return;
+          }
+          throw new Error('Gagal mengambil data.');
+        }
+
+        const users = await response.json();
+        tbody.innerHTML = ''; // Kosongkan 'Memuat data...'
+
+        if (users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Belum ada user terdaftar.</td></tr>';
+          return;
+        }
+
+        users.forEach(user => {
+          const row = document.createElement('tr');
+          
+          const statusClass = user.is_expired ? 'status-expired' : 'status-active';
+          const statusText = user.is_expired ? 'Kadaluarsa' : 'Aktif';
+          
+          // Format tanggal
+          const expiryDate = new Date(user.outofdate).toLocaleString('id-ID', {
+             year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+
+          row.innerHTML = `
+            <td>${user.first_name}</td>
+            <td>${user.last_name}</td>
+            <td>${user.email}</td>
+            <td><code>${user.api_key}</code></td>
+            <td>${expiryDate}</td>
+            <td class="${statusClass}">${statusText}</td>
+          `;
+          tbody.appendChild(row);
+        });
+
+      } catch (error) {
+        console.error(error);
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">Error: ${error.message}</td></tr>`;
+      }
+    });
+  </script>
+</body>
+</html>
