@@ -9,7 +9,7 @@ require('dotenv').config()
 const app = express()
 const port = 3000
 
-// ---------------------- MIDDLEWARE ----------------------
+// ---------------------- MIDDLEWARE -----------------------
 app.use(express.json())
 app.use(express.static(path.join(__dirname, 'public')))
 
