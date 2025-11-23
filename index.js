@@ -32,13 +32,12 @@ app.get('/test', (req, res) => {
   res.send("Server berjalan normal");
 });
 
-// ---------------------- CREATE API KEY (FINAL FIX: TIMESTAMP VALUE) ----------------------
+// ---------------------- CREATE API KEY ----------------------
 app.post('/create', (req, res) => {
   const apiKey = `sk-sm-v1-${crypto.randomBytes(16).toString('hex')}`;
+  const statusToInsert = null; // FIX: Menggunakan NULL untuk TIMESTAMP
 
-  // FIX: Mengubah nilai `0` menjadi `null` karena kolom `outofdate` adalah TIMESTAMP
-  const statusToInsert = null; 
-
+  // FIX: Menggunakan `api_key` dan `outofdate`
   const query = "INSERT INTO api_keys (api_key, outofdate) VALUES (?, ?)"; 
   
   db.query(query, [apiKey, statusToInsert], (err) => {
@@ -50,7 +49,7 @@ app.post('/create', (req, res) => {
   });
 });
 
-// ---------------------- SAVE USER + API KEY FK (FIXED `api_key`) ----------------------
+// ---------------------- SAVE USER + API KEY FK ----------------------
 app.post('/save-user', (req, res) => {
   const { apiKey, first_name, last_name, email } = req.body;
 
@@ -58,7 +57,7 @@ app.post('/save-user', (req, res) => {
     return res.json({ success: false, message: "Data belum lengkap!" });
   }
 
-  // PERBAIKAN: Mengubah kolom `key` menjadi `api_key`
+  // FIX: Menggunakan `api_key`
   const findKey = "SELECT id FROM api_keys WHERE api_key = ?";
   
   db.query(findKey, [apiKey], (err, keyResult) => {
@@ -78,16 +77,15 @@ app.post('/save-user', (req, res) => {
   });
 });
 
-// ---------------------- ADMIN REGISTER (FIXED TABLE NAME) ----------------------
+// ---------------------- ADMIN REGISTER ----------------------
 app.post('/admin/register', async (req, res) => {
   const { email, password } = req.body;
   const hashed = await bcrypt.hash(password, 10);
 
-  // FIX: Mengubah tabel dari `admin` menjadi `admins`
+  // FIX: Menggunakan tabel `admins`
   db.query("INSERT INTO admins (email, password) VALUES (?, ?)",
     [email, hashed],
     (err) => {
-      // Perbaikan: Menambahkan cek error spesifik untuk email duplikat
       if (err && err.code === 'ER_DUP_ENTRY') { 
         return res.json({ success: false, message: "Email Admin sudah terdaftar!" }); 
       } else if (err) {
@@ -98,11 +96,11 @@ app.post('/admin/register', async (req, res) => {
     });
 });
 
-// ---------------------- ADMIN LOGIN (FIXED TABLE NAME) ----------------------
+// ---------------------- ADMIN LOGIN ----------------------
 app.post('/admin/login', (req, res) => {
   const { email, password } = req.body;
 
-  // FIX: Mengubah tabel dari `admin` menjadi `admins`
+  // FIX: Menggunakan tabel `admins`
   db.query("SELECT * FROM admins WHERE email = ?", [email], async (err, result) => {
     if (err) {
       console.error("Error Login Admin:", err);
@@ -124,18 +122,23 @@ app.post('/admin/login', (req, res) => {
   });
 });
 
-// ---------------------- DASHBOARD: GET ALL USERS (FIXED TIMESTAMP LOGIC) ----------------------
+// ---------------------- DASHBOARD: GET ALL USERS (FINAL FIX: created_at) ----------------------
 app.get('/admin/users', (req, res) => {
-  // PERBAIKAN: Mengubah `api_keys.out_of_date` menjadi `api_keys.outofdate`
+  // FIX: Mengubah `api_keys.createdAt` menjadi `api_keys.created_at AS createdAt`
   const query = `
     SELECT users.id, users.first_name, users.last_name, users.email, 
-           api_keys.api_key AS 'key', api_keys.createdAt, api_keys.outofdate AS out_of_date 
+           api_keys.api_key AS 'key', 
+           api_keys.created_at AS createdAt, 
+           api_keys.outofdate AS out_of_date 
     FROM users 
     LEFT JOIN api_keys ON users.api_key_id = api_keys.id
   `;
 
   db.query(query, (err, result) => {
-    if (err) return res.json({ success: false });
+    if (err) {
+      console.error("Error Get Users:", err); 
+      return res.json({ success: false, message: "Gagal mengambil data user." });
+    }
 
     // PROSES LOGIKA 30 HARI DI SINI
     const finalData = result.map(user => {
@@ -144,14 +147,11 @@ app.get('/admin/users', (req, res) => {
       if (!user.key) {
         status = 'OFF';
       } else {
-        // Hitung selisih hari dari sekarang vs tanggal buat
         const createdDate = new Date(user.createdAt);
         const now = new Date();
         const diffTime = Math.abs(now - createdDate);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
 
-        // FIX LOGIC: Cek apakah kolom TIMESTAMP `out_of_date` (alias dari outofdate) 
-        // memiliki nilai (artinya dinonaktifkan manual), ATAU sudah lebih dari 30 hari.
         if (user.out_of_date !== null || diffDays > 30) {
           status = 'OFF';
         }
