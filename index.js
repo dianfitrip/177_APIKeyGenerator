@@ -1,305 +1,175 @@
 // ---------------------- IMPORT MODULE ----------------------
-const express = require('express')
-const path = require('path')
-const crypto = require('crypto')
-const mysql = require('mysql2')
-const bcrypt = require('bcrypt')
-const session = require('express-session') // Import session
-require('dotenv').config()
+const express = require('express');
+const path = require('path');
+const crypto = require('crypto');
+const mysql = require('mysql2');
+const bcrypt = require('bcrypt');
+require('dotenv').config();
 
-const app = express()
-const port = 3000
-const SALT_ROUNDS = 10 // Untuk bcrypt
+const app = express();
+const port = process.env.PORT || 3000;
 
-// ---------------------- MIDDLEWARE -----------------------
-app.use(express.json()) // Untuk parsing body JSON
-app.use(express.urlencoded({ extended: true })) // Untuk parsing form-encoded body
-app.use(express.static(path.join(__dirname, 'public')))
+// ---------------------- MIDDLEWARE ----------------------
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Konfigurasi Session
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'rahasia-banget-nih', // Ambil dari .env atau gunakan default
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: false, // Set 'true' jika Anda menggunakan HTTPS
-      maxAge: 1000 * 60 * 60 * 24, // Cookie berlaku 1 hari
-    },
-  })
-)
-
-// ---------------------- KONFIGURASI DATABASE ----------------------
+// ---------------------- KONFIG DATABASE ----------------------
 const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: 'Df999999999999.',
-  database: 'apikey_db',
-}).promise() // Gunakan .promise() untuk async/await
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASS || 'Df999999999999.',
+  database: process.env.DB_NAME || 'apikey_db'
+});
 
-// Tes koneksi (opsional, .promise() menangani ini)
-db.connect()
-  .then(() => console.log('✅ Terhubung ke database MySQL'))
-  .catch((err) => console.error('❌ Gagal terhubung ke database:', err))
+db.connect(err => {
+  if (err) console.error("❌ DB ERROR:", err);
+  else console.log("✅ Terkoneksi ke MySQL");
+});
 
-// ---------------------- ENDPOINT TEST ----------------------
+// ---------------------- TEST ----------------------
 app.get('/test', (req, res) => {
-  res.send('Server API Key berjalan normal 🚀')
-})
+  res.send("Server berjalan normal");
+});
 
-// ---------------------- ENDPOINT USER BARU ----------------------
+// ---------------------- CREATE API KEY ----------------------
+app.post('/create', (req, res) => {
+  const apiKey = `sk-sm-v1-${crypto.randomBytes(16).toString('hex')}`;
 
-/**
- * Endpoint ini hanya men-generate API Key dan menyimpannya ke DB.
- * Endpoint ini dipanggil oleh tombol "Create API Key" di index.html.
- */
-app.post('/generate-key', async (req, res) => {
-  try {
-    // Generate 3 bagian random API key
-    const apiKey = `sk-sm-v1-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`
+  // Menggunakan 'out_of_date' (0 = aktif) sesuai tabel baru
+  const query = "INSERT INTO api_keys (`key`, out_of_date) VALUES (?, ?)";
+  db.query(query, [apiKey, 0], (err) => {
+    if (err) return res.status(500).json({ success: false });
+    res.status(201).json({ success: true, apiKey });
+  });
+});
 
-    // Hitung tanggal kadaluarsa (1 bulan dari sekarang)
-    const outofdate = new Date()
-    outofdate.setMonth(outofdate.getMonth() + 1)
+// ---------------------- SAVE USER + API KEY FK ----------------------
+app.post('/save-user', (req, res) => {
+  const { apiKey, first_name, last_name, email } = req.body;
 
-    // Simpan ke database
-    const query = 'INSERT INTO api_keys (api_key, outofdate) VALUES (?, ?)'
-    const [result] = await db.query(query, [apiKey, outofdate])
-
-    console.log('🔑 API Key baru disimpan:', apiKey)
-    // Kembalikan API key DAN ID-nya
-    res.json({ apiKey, apiKeyId: result.insertId })
-  } catch (err) {
-    console.error('❌ Gagal menyimpan API key:', err)
-    res.status(500).json({ message: 'Gagal menyimpan API key.' })
-  }
-})
-
-/**
- * Endpoint ini mendaftarkan user baru.
- * Dipanggil oleh tombol "Save" di index.html setelah API key di-generate.
- */
-app.post('/register', async (req, res) => {
-  const { firstName, lastName, email, apiKeyId } = req.body
-
-  // Validasi input
-  if (!firstName || !lastName || !email || !apiKeyId) {
-    return res.status(400).json({ message: 'Semua field harus diisi.' })
+  if (!apiKey || !first_name || !last_name || !email) {
+    return res.json({ success: false, message: "Data belum lengkap!" });
   }
 
-  try {
-    // Cek apakah email sudah terdaftar
-    let [users] = await db.query('SELECT * FROM users WHERE email = ?', [email])
-    if (users.length > 0) {
-      return res.status(409).json({ message: 'Email sudah terdaftar.' })
+  const findKey = "SELECT id FROM api_keys WHERE `key` = ?";
+  db.query(findKey, [apiKey], (err, keyResult) => {
+    if (err || keyResult.length === 0) {
+      return res.json({ success: false, message: "API Key tidak ditemukan!" });
     }
 
-    // Cek apakah api_key_id sudah terpakai
-    let [keys] = await db.query('SELECT * FROM users WHERE api_key_id = ?', [
-      apiKeyId,
-    ])
-    if (keys.length > 0) {
-      return res
-        .status(409)
-        .json({ message: 'API Key ID ini sudah digunakan.' })
-    }
+    const apiKeyId = keyResult[0].id;
+    const insertUser = "INSERT INTO users (first_name, last_name, email, api_key_id) VALUES (?, ?, ?, ?)";
 
-    // Simpan user baru
-    const query =
-      'INSERT INTO users (first_name, last_name, email, api_key_id) VALUES (?, ?, ?, ?)'
-    await db.query(query, [firstName, lastName, email, apiKeyId])
-
-    res.status(201).json({ message: 'User berhasil didaftarkan! ✅' })
-  } catch (err) {
-    console.error('❌ Gagal mendaftarkan user:', err)
-    res.status(500).json({ message: 'Terjadi kesalahan server.' })
-  }
-})
-
-// ---------------------- ENDPOINT CEK API KEY (Login User) ----------------------
-app.post('/checkapi', async (req, res) => {
-  const { apiKey } = req.body
-
-  if (!apiKey) {
-    return res
-      .status(400)
-      .json({ valid: false, message: 'API key tidak boleh kosong.' })
-  }
-
-  try {
-    const query = 'SELECT * FROM api_keys WHERE api_key = ?'
-    const [keys] = await db.query(query, [apiKey])
-
-    if (keys.length > 0) {
-      const keyData = keys[0]
-
-      // Cek kadaluarsa
-      if (new Date(keyData.outofdate) < new Date()) {
-        return res
-          .status(401)
-          .json({ valid: false, message: 'API key sudah kadaluarsa. ⏳' })
+    db.query(insertUser, [first_name, last_name, email, apiKeyId], (err) => {
+      if (err) {
+        return res.json({ success: false, message: "Email sudah terdaftar!" });
       }
+      res.json({ success: true, message: "User berhasil disimpan!" });
+    });
+  });
+});
 
-      // Cek apakah key terhubung ke user
-      const [users] = await db.query(
-        'SELECT first_name, last_name, email FROM users WHERE api_key_id = ?',
-        [keyData.id]
-      )
-
-      if (users.length > 0) {
-        res.json({
-          valid: true,
-          message: 'API key valid ✅',
-          user: users[0],
-        })
-      } else {
-        res.json({
-          valid: true,
-          message: 'API key valid, tapi belum terhubung ke user.',
-          user: null,
-        })
-      }
-    } else {
-      res.json({ valid: false, message: 'API key tidak valid ❌' })
-    }
-  } catch (err) {
-    console.error('❌ Gagal mengecek API key:', err)
-    res.status(500).json({ valid: false, message: 'Terjadi kesalahan server.' })
-  }
-})
-
-// ---------------------- RUTE HALAMAN ----------------------
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'))
-})
-
-app.get('/admin-register', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin-register.html'))
-})
-
-app.get('/admin-login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin-login.html'))
-})
-
-// Halaman dashboard, dilindungi oleh middleware
-app.get('/admin-dashboard', isAdmin, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin-dashboard.html'))
-})
-
-// ---------------------- RUTE ADMIN ----------------------
-
-// Middleware untuk proteksi rute admin
-function isAdmin(req, res, next) {
-  if (req.session.adminId) {
-    next() // Lanjut jika admin sudah login
-  } else {
-    // Jika tidak ada session, redirect ke halaman login
-    res.redirect('/admin-login.html')
-  }
-}
-
-// 1. Registrasi Admin
+// ---------------------- ADMIN REGISTER ----------------------
 app.post('/admin/register', async (req, res) => {
-  const { email, password } = req.body
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Email dan password harus diisi.' })
-  }
+  const { email, password } = req.body;
+  const hashed = await bcrypt.hash(password, 10);
 
-  try {
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS)
+  db.query("INSERT INTO admin (email, password) VALUES (?, ?)",
+    [email, hashed],
+    (err) => {
+      if (err) return res.json({ success: false, message: "Admin sudah ada!" });
+      res.json({ success: true, message: "Admin berhasil dibuat!" });
+    });
+});
 
-    // Simpan admin ke DB
-    const query = 'INSERT INTO admins (email, password) VALUES (?, ?)'
-    await db.query(query, [email, hashedPassword])
+// ---------------------- ADMIN LOGIN ----------------------
+app.post('/admin/login', (req, res) => {
+  const { email, password } = req.body;
 
-    res.status(201).json({ message: 'Admin berhasil didaftarkan! ✅' })
-  } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ message: 'Email admin sudah ada.' })
-    }
-    console.error('❌ Gagal registrasi admin:', err)
-    res.status(500).json({ message: 'Terjadi kesalahan server.' })
-  }
-})
-
-// 2. Login Admin
-app.post('/admin/login', async (req, res) => {
-  const { email, password } = req.body
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Email dan password harus diisi.' })
-  }
-
-  try {
-    // Cari admin berdasarkan email
-    const query = 'SELECT * FROM admins WHERE email = ?'
-    const [admins] = await db.query(query, [email])
-
-    if (admins.length === 0) {
-      return res.status(401).json({ message: 'Email atau password salah.' })
+  db.query("SELECT * FROM admin WHERE email = ?", [email], async (err, result) => {
+    if (err || result.length === 0) {
+      return res.json({ success: false, message: "Admin tidak ditemukan!" });
     }
 
-    const admin = admins[0]
+    const admin = result[0];
+    const match = await bcrypt.compare(password, admin.password);
 
-    // Bandingkan password
-    const isMatch = await bcrypt.compare(password, admin.password)
-
-    if (isMatch) {
-      // Buat session
-      req.session.adminId = admin.id
-      req.session.adminEmail = admin.email
-      res.json({ message: 'Login berhasil! Mengarahkan ke dashboard...' })
-    } else {
-      res.status(401).json({ message: 'Email atau password salah.' })
+    if (!match) {
+      return res.json({ success: false, message: "Password salah!" });
     }
-  } catch (err) {
-    console.error('❌ Gagal login admin:', err)
-    res.status(500).json({ message: 'Terjadi kesalahan server.' })
-  }
-})
 
-// 3. Logout Admin
-app.get('/admin/logout', (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      return res
-        .status(500)
-        .json({ message: 'Gagal logout.' })
-    }
-    res.redirect('/admin-login.html')
-  })
-})
+    res.json({ success: true, message: "Login berhasil!" });
+  });
+});
 
-// 4. API untuk mengambil data user (untuk dashboard)
-app.get('/admin/users', isAdmin, async (req, res) => {
-  try {
-    const query = `
-      SELECT 
-        u.first_name, 
-        u.last_name, 
-        u.email, 
-        a.api_key, 
-        a.outofdate
-      FROM users u
-      JOIN api_keys a ON u.api_key_id = a.id
-      ORDER BY u.created_at DESC
-    `
-    const [users] = await db.query(query)
+// ---------------------- DASHBOARD: GET ALL USERS ----------------------
+app.get('/admin/users', (req, res) => {
+  // Ambil data user beserta tanggal pembuatan key (createdAt)
+  const query = `
+    SELECT users.id, users.first_name, users.last_name, users.email, 
+           api_keys.key, api_keys.createdAt, api_keys.out_of_date 
+    FROM users 
+    LEFT JOIN api_keys ON users.api_key_id = api_keys.id
+  `;
 
-    // Tambahkan status kadaluarsa
-    const usersWithStatus = users.map((user) => ({
-      ...user,
-      is_expired: new Date(user.outofdate) < new Date(),
-    }))
+  db.query(query, (err, result) => {
+    if (err) return res.json({ success: false });
 
-    res.json(usersWithStatus)
-  } catch (err) {
-    console.error('❌ Gagal mengambil data user:', err)
-    res.status(500).json({ message: 'Terjadi kesalahan server.' })
-  }
-})
+    // PROSES LOGIKA 30 HARI DI SINI
+    const finalData = result.map(user => {
+      let status = 'ON'; // Default aktif
 
-// ---------------------- JALANKAN SERVER ----------------------
+      if (!user.key) {
+        status = 'OFF';
+      } else {
+        // Hitung selisih hari dari sekarang vs tanggal buat
+        const createdDate = new Date(user.createdAt);
+        const now = new Date();
+        const diffTime = Math.abs(now - createdDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+
+        // Jika manual dimatikan (out_of_date=1) ATAU umur > 30 hari -> OFF
+        if (user.out_of_date === 1 || diffDays > 30) {
+          status = 'OFF';
+        }
+      }
+      return { ...user, status };
+    });
+
+    res.json({ success: true, data: finalData });
+  });
+});
+
+// ---------------------- ADMIN DELETE USER ----------------------
+app.delete('/admin/delete-user/:id', (req, res) => {
+  // Karena ON DELETE CASCADE di database, hapus user bisa langsung, 
+  // atau hapus API key-nya (sesuai kebutuhan). Di sini hapus user.
+  const id = req.params.id;
+  db.query("DELETE FROM users WHERE id = ?", [id], (err) => {
+    if (err) return res.status(500).json({ message: "Gagal menghapus" });
+    res.json({ message: "User berhasil dihapus" });
+  });
+});
+
+// ---------------------- ROUTING FILE HTML ----------------------
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
+
+app.get('/admin/login', (req, res) => {
+  res.sendFile(__dirname + '/public/admin/login.html');
+});
+
+app.get('/admin/register', (req, res) => {
+  res.sendFile(__dirname + '/public/admin/register.html');
+});
+
+app.get('/admin/dashboard', (req, res) => {
+  res.sendFile(__dirname + '/public/admin/dashboard.html');
+});
+
+// ---------------------- RUN SERVER ----------------------
 app.listen(port, () => {
-  console.log(`✅ Server berjalan di http://localhost:${port}`)
-})
+  console.log(`Server running → http://localhost:${port}`);
+});

@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registrasi User & API Key</title>
+  <title>Pembuat API Key</title>
   <style>
     body {
       font-family: 'Poppins', sans-serif;
-      background-color: #f3e8ff;
+      background-color: #F0EFFF; /* Ungu Pastel Sangat Muda */
       color: #4a4a4a;
       display: flex;
       justify-content: center;
@@ -15,195 +15,168 @@
       height: 100vh;
       margin: 0;
     }
+
     .container {
-      background-color: #f8f5ff;
+      background-color: #ffffff;
       border-radius: 20px;
-      box-shadow: 0 4px 12px rgba(128, 90, 213, 0.25);
+      box-shadow: 0 4px 12px rgba(163, 102, 255, 0.25); /* Bayangan Ungu Pastel */
       padding: 30px;
-      width: 400px;
+      width: 380px;
       text-align: center;
     }
+
     h1 {
-      color: #7e57c2;
-      margin-bottom: 20px;
+      color: #7A40CC; /* Ungu Lebih Dalam */
+      margin-bottom: 15px;
     }
+
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border: 2px solid #CBB6FF; /* Garis Tepi Ungu Pastel */
+      border-radius: 10px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
     button {
-      background-color: #b388ff;
+      background-color: #A366FF; /* Ungu Pastel Utama */
       color: white;
       border: none;
       border-radius: 12px;
       padding: 10px 20px;
       font-size: 16px;
       cursor: pointer;
+      margin-top: 15px;
+      width: 100%;
       transition: background-color 0.3s ease, transform 0.2s;
-      margin-top: 10px;
     }
+
     button:hover {
-      background-color: #9c6bff;
+      background-color: #7A40CC; /* Ungu Lebih Dalam untuk Hover */
       transform: scale(1.05);
     }
+
     button:disabled {
-      background-color: #d1c4e9;
+      background-color: #E6E0FF; /* Ungu Pastel Sangat Muda untuk Disabled */
       cursor: not-allowed;
     }
-    .textarea-wrapper {
-      position: relative;
-      margin-top: 20px;
-    }
-    textarea {
-      width: 100%;
-      height: 100px;
-      border: 2px solid #c4b5fd;
-      border-radius: 10px;
-      padding: 10px;
-      font-size: 14px;
-      resize: none;
-      box-sizing: border-box;
-    }
-    .form-group {
-      margin-top: 15px;
-      text-align: left;
-    }
-    .form-group label {
-      display: block;
-      margin-bottom: 5px;
-      color: #5e35b1;
-    }
-    .form-group input {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #c4b5fd;
-      border-radius: 8px;
-      box-sizing: border-box;
-    }
+
     .message {
-      margin-top: 15px;
       font-size: 14px;
-      height: 20px;
+      color: #7A40CC; /* Ungu Lebih Dalam untuk Teks Pesan */
+      height: 18px;
+      margin-top: 10px;
     }
-    .message.success {
-      color: green;
-    }
-    .message.error {
-      color: red;
+
+    h3 {
+      color: #7A40CC; /* Ungu Lebih Dalam */
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
+
   <div class="container">
-    <h1>Registrasi User</h1>
-    <p>Langkah 1: Buat API Key Anda</p>
-    <button id="btnCreate">Create API Key</button>
+    <h1>Buat API Key</h1>
 
-    <div class="textarea-wrapper">
-      <textarea id="apikey" readonly placeholder="API Key akan muncul di sini..."></textarea>
-    </div>
+    <button id="btnCreate">Generate API Key</button>
 
-    <div id="registration-form" style="display: none;">
-      <p>Langkah 2: Isi Data Diri Anda</p>
-      <div class="form-group">
-        <label for="firstName">First Name</label>
-        <input type="text" id="firstName" name="firstName" required>
-      </div>
-      <div class="form-group">
-        <label for="lastName">Last Name</label>
-        <input type="text" id="lastName" name="lastName" required>
-      </div>
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" required>
-      </div>
-      <button id="btnSave">Save Data</button>
-    </div>
+    <textarea id="apikey" readonly placeholder="API key akan muncul di sini..."></textarea>
 
-    <div class="message" id="message"></div>
+    <h3 style="color:#7A40CC; margin-top:20px;">Data User</h3>
+    <input type="text" id="fname" placeholder="First Name">
+    <input type="text" id="lname" placeholder="Last Name">
+    <input type="email" id="email" placeholder="Email">
+
+    <button id="btnSave" disabled>Simpan User</button>
+
+    <div class="message" id="msg"></div>
   </div>
 
   <script>
-    const textarea = document.getElementById('apikey');
-    const btnCreate = document.getElementById('btnCreate');
-    const btnSave = document.getElementById('btnSave');
-    const registrationForm = document.getElementById('registration-form');
-    const messageEl = document.getElementById('message');
+    const apiField = document.getElementById("apikey");
+    const btnCreate = document.getElementById("btnCreate");
+    const btnSave = document.getElementById("btnSave");
+    const msg = document.getElementById("msg");
 
-    let currentApiKeyId = null; // Untuk menyimpan ID API key
+    const fname = document.getElementById("fname");
+    const lname = document.getElementById("lname");
+    const email = document.getElementById("email");
 
-    // Fungsi membuat API Key dari backend
-    btnCreate.addEventListener('click', async () => {
-      textarea.value = "Memproses...";
-      messageEl.textContent = "";
-      btnCreate.disabled = true;
+    function checkForm() {
+      if (apiField.value.trim() !== "" &&
+          fname.value.trim() !== "" &&
+          lname.value.trim() !== "" &&
+          email.value.trim() !== "") {
+        btnSave.disabled = false;
+      } else {
+        btnSave.disabled = true;
+      }
+    }
+
+    fname.oninput = checkForm;
+    lname.oninput = checkForm;
+    email.oninput = checkForm;
+
+    // --- LOGIKA FETCH DIPERBAIKI DAN DITINGKATKAN PENANGANAN ERROR ---
+    btnCreate.addEventListener("click", async () => {
+      apiField.value = "Memproses...";
+      msg.textContent = "";
 
       try {
-        const response = await fetch('/generate-key', { method: 'POST' });
-        const data = await response.json();
-
-        if (response.ok) {
-          textarea.value = data.apiKey;
-          currentApiKeyId = data.apiKeyId; // Simpan ID
-          registrationForm.style.display = 'block'; // Tampilkan form data diri
-          messageEl.textContent = "Silakan isi data diri Anda.";
+        const res = await fetch("/create", { method: "POST" });
+        const data = await res.json();
+        
+        if (data && data.success && data.apiKey) {
+          // data.apiKey adalah properti yang benar dikirim dari server index.js
+          apiField.value = data.apiKey; 
+          checkForm();
         } else {
-          textarea.value = "Gagal membuat API Key!";
-          messageEl.textContent = data.message || "Gagal membuat API Key!";
-          btnCreate.disabled = false;
+          apiField.value = "Gagal mendapatkan key. Cek server.";
+          msg.textContent = data.message || "Kesalahan respons dari server.";
         }
+
       } catch (error) {
-        textarea.value = "Terjadi kesalahan.";
-        messageEl.textContent = "Terjadi kesalahan koneksi.";
-        btnCreate.disabled = false;
-        console.error(error);
+        apiField.value = "Error koneksi server.";
+        msg.textContent = "Gagal terhubung ke server.";
+        console.error("Fetch Error:", error);
       }
     });
 
-    // Fungsi menyimpan data user
-    btnSave.addEventListener('click', async () => {
-      const firstName = document.getElementById('firstName').value;
-      const lastName = document.getElementById('lastName').value;
-      const email = document.getElementById('email').value;
+    btnSave.addEventListener("click", async () => {
+      msg.textContent = "";
 
-      if (!firstName || !lastName || !email || !currentApiKeyId) {
-        messageEl.className = 'message error';
-        messageEl.textContent = "Harap isi semua data dan buat API Key dahulu.";
-        return;
-      }
+      const payload = {
+        apiKey: apiField.value,
+        first_name: fname.value,
+        last_name: lname.value,
+        email: email.value
+      };
 
-      btnSave.disabled = true;
-      btnSave.textContent = "Menyimpan...";
+      const res = await fetch("/save-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-      try {
-        const response = await fetch('/register', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            firstName,
-            lastName,
-            email,
-            apiKeyId: currentApiKeyId
-          }),
-        });
+      const result = await res.json();
+      msg.textContent = result.message;
 
-        const data = await response.json();
-        if (response.ok) {
-          messageEl.className = 'message success';
-          messageEl.textContent = data.message;
-          registrationForm.style.display = 'none'; // Sembunyikan form
-        } else {
-          messageEl.className = 'message error';
-          messageEl.textContent = data.message || "Gagal mendaftar.";
-          btnSave.disabled = false;
-          btnSave.textContent = "Save Data";
-        }
-      } catch (error) {
-        messageEl.className = 'message error';
-        messageEl.textContent = "Terjadi kesalahan koneksi.";
-        btnSave.disabled = false;
-        btnSave.textContent = "Save Data";
-        console.error(error);
+      if (result.success) {
+
+        alert("BERHASIL!\n" + result.message);
+        fname.value = "";
+        lname.value = "";
+        email.value = "";
+        apiField.value = "";
+        btnSave.disabled = true;
+
+        
       }
     });
   </script>
+
 </body>
 </html>

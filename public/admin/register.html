@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register Admin</title>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #F0EFFF; /* Ungu Pastel Sangat Muda */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: white;
+      width: 350px;
+      padding: 25px;
+      border-radius: 15px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    h2 { color: #7A40CC; } /* Ungu Lebih Dalam */
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border: 1px solid #CBB6FF; /* Garis Tepi Ungu Pastel */
+      border-radius: 10px;
+    }
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: #A366FF; /* Ungu Pastel Utama */
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover { background: #7A40CC; } /* Ungu Lebih Dalam untuk Hover */
+    a { color: #7A40CC; font-size: 14px; } /* Ungu Lebih Dalam untuk Link */
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>Register Admin</h2>
+
+    <input id="email" type="email" placeholder="Email baru">
+    <input id="password" type="password" placeholder="Password">
+    <button id="btnRegister">Daftar</button>
+
+    <p style="margin-top:15px;">
+      Sudah punya akun? <a href="login.html">Login</a>
+    </p>
+  </div>
+
+<script>
+document.getElementById("btnRegister").addEventListener("click", async () => {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  if (!email || !password) return alert("Harap isi semuanya!");
+
+  const res = await fetch('/admin/register', {
+    method: 'POST',
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+
+  const data = await res.json();
+  alert(data.message);
+
+  if (data.success) {
+    window.location.href = "login.html";
+  }
+});
+</script>
+
+</body>
+</html>

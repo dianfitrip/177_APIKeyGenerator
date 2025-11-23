@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dashboard Admin</title>
+  <style>
+    /* --- Menggunakan Style Warna Pastel Ungu (Lavender) --- */
+    body {
+      background: #F0EFFF; /* Background Ungu Pastel Sangat Muda */
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .box {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    }
+
+    h1 {
+      text-align: center;
+      color: #7A40CC; /* Ungu Lebih Dalam */
+    }
+
+    h2 {
+      margin-top: 0;
+      color: #7A40CC; /* Ungu Lebih Dalam */
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #ccc;
+      text-align: center;
+    }
+
+    th {
+      background: #CBB6FF; /* Header tabel Ungu Pastel */
+      color: white;
+    }
+
+    /* --- Style Tambahan untuk Tombol & Status --- */
+    .btn-hapus {
+      background: #FF8F8F; /* Merah Pastel */
+      color: #444; 
+      border: none;
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .btn-hapus:hover {
+      background: #FF6666; /* Merah Pastel Lebih Gelap */
+    }
+
+    .status-on {
+      color: #5B8F00; /* Hijau Pastel Text */
+      font-weight: bold;
+      background: #EBF5E0; /* Hijau Pastel Background */
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .status-off {
+      color: #D93333; /* Merah Pastel Text */
+      font-weight: bold;
+      background: #FFEDED; /* Merah Pastel Background */
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Dashboard Admin</h1>
+
+<div class="box">
+  <h2>Daftar User & Status API</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nama User</th>
+        <th>Email</th>
+        <th>API Key</th>
+        <th>Status</th> <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody id="user-table-body"></tbody>
+  </table>
+</div>
+
+<script>
+// ------------------ LOAD DATA ------------------
+fetch('/admin/users')
+  .then(res => res.json())
+  .then(result => {
+    const tbody = document.getElementById("user-table-body");
+
+    result.data.forEach(u => {
+      // Menentukan warna dan teks status
+      // LOGIKA STATUS: 
+      // Menggunakan logika status 'ON'/'OFF' yang telah dihitung di index.js
+      let statusHtml = '';
+      
+      if (u.status === 'ON') { 
+         statusHtml = '<span class="status-on">ON (Aktif)</span>';
+      } else {
+         statusHtml = '<span class="status-off">OFF (Mati)</span>';
+      }
+
+      tbody.innerHTML += `
+        <tr>
+          <td>${u.id}</td>
+          <td>${u.first_name} ${u.last_name}</td>
+          <td>${u.email}</td>
+          <td>${u.key ?? '-'}</td> <td>${statusHtml}</td>   <td>
+            <button class="btn-hapus" onclick="hapusUser(${u.id})">Hapus</button>
+          </td>
+        </tr>
+      `;
+    });
+  });
+
+// ------------------ FUNGSI HAPUS ------------------
+function hapusUser(id) {
+  if (!confirm("Yakin mau hapus user ini beserta API Key-nya?")) return;
+
+  fetch(`/admin/delete-user/${id}`, { method: 'DELETE' })
+    .then(res => res.json())
+    .then(result => {
+      alert(result.message);
+      location.reload();
+    })
+    .catch(err => alert("Gagal menghapus user"));
+}
+</script>
+
+</body>
+</html>
