@@ -18,7 +18,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const db = mysql.createConnection({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASS || 'Df999999999999.',
+  password: process.env.DB_PASSWORD || process.env.DB_PASS || 'Df999999999999.', 
   database: process.env.DB_NAME || 'apikey_db'
 });
 
@@ -32,19 +32,25 @@ app.get('/test', (req, res) => {
   res.send("Server berjalan normal");
 });
 
-// ---------------------- CREATE API KEY ----------------------
+// ---------------------- CREATE API KEY (FINAL FIX: TIMESTAMP VALUE) ----------------------
 app.post('/create', (req, res) => {
   const apiKey = `sk-sm-v1-${crypto.randomBytes(16).toString('hex')}`;
 
-  // Menggunakan 'out_of_date' (0 = aktif) sesuai tabel baru
-  const query = "INSERT INTO api_keys (`key`, out_of_date) VALUES (?, ?)";
-  db.query(query, [apiKey, 0], (err) => {
-    if (err) return res.status(500).json({ success: false });
+  // FIX: Mengubah nilai `0` menjadi `null` karena kolom `outofdate` adalah TIMESTAMP
+  const statusToInsert = null; 
+
+  const query = "INSERT INTO api_keys (api_key, outofdate) VALUES (?, ?)"; 
+  
+  db.query(query, [apiKey, statusToInsert], (err) => {
+    if (err) {
+      console.error("Error INSERT API Key:", err); 
+      return res.status(500).json({ success: false, message: "Gagal menyimpan key ke database." }); 
+    }
     res.status(201).json({ success: true, apiKey });
   });
 });
 
-// ---------------------- SAVE USER + API KEY FK ----------------------
+// ---------------------- SAVE USER + API KEY FK (FIXED `api_key`) ----------------------
 app.post('/save-user', (req, res) => {
   const { apiKey, first_name, last_name, email } = req.body;
 
@@ -52,7 +58,9 @@ app.post('/save-user', (req, res) => {
     return res.json({ success: false, message: "Data belum lengkap!" });
   }
 
-  const findKey = "SELECT id FROM api_keys WHERE `key` = ?";
+  // PERBAIKAN: Mengubah kolom `key` menjadi `api_key`
+  const findKey = "SELECT id FROM api_keys WHERE api_key = ?";
+  
   db.query(findKey, [apiKey], (err, keyResult) => {
     if (err || keyResult.length === 0) {
       return res.json({ success: false, message: "API Key tidak ditemukan!" });
@@ -103,12 +111,12 @@ app.post('/admin/login', (req, res) => {
   });
 });
 
-// ---------------------- DASHBOARD: GET ALL USERS ----------------------
+// ---------------------- DASHBOARD: GET ALL USERS (FIXED TIMESTAMP LOGIC) ----------------------
 app.get('/admin/users', (req, res) => {
-  // Ambil data user beserta tanggal pembuatan key (createdAt)
+  // PERBAIKAN: Mengubah `api_keys.out_of_date` menjadi `api_keys.outofdate`
   const query = `
     SELECT users.id, users.first_name, users.last_name, users.email, 
-           api_keys.key, api_keys.createdAt, api_keys.out_of_date 
+           api_keys.api_key AS 'key', api_keys.createdAt, api_keys.outofdate AS out_of_date 
     FROM users 
     LEFT JOIN api_keys ON users.api_key_id = api_keys.id
   `;
@@ -129,8 +137,9 @@ app.get('/admin/users', (req, res) => {
         const diffTime = Math.abs(now - createdDate);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
 
-        // Jika manual dimatikan (out_of_date=1) ATAU umur > 30 hari -> OFF
-        if (user.out_of_date === 1 || diffDays > 30) {
+        // FIX LOGIC: Cek apakah kolom TIMESTAMP `out_of_date` (alias dari outofdate) 
+        // memiliki nilai (artinya dinonaktifkan manual), ATAU sudah lebih dari 30 hari.
+        if (user.out_of_date !== null || diffDays > 30) {
           status = 'OFF';
         }
       }
@@ -143,8 +152,6 @@ app.get('/admin/users', (req, res) => {
 
 // ---------------------- ADMIN DELETE USER ----------------------
 app.delete('/admin/delete-user/:id', (req, res) => {
-  // Karena ON DELETE CASCADE di database, hapus user bisa langsung, 
-  // atau hapus API key-nya (sesuai kebutuhan). Di sini hapus user.
   const id = req.params.id;
   db.query("DELETE FROM users WHERE id = ?", [id], (err) => {
     if (err) return res.status(500).json({ message: "Gagal menghapus" });
