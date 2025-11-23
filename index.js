@@ -78,25 +78,38 @@ app.post('/save-user', (req, res) => {
   });
 });
 
-// ---------------------- ADMIN REGISTER ----------------------
+// ---------------------- ADMIN REGISTER (FIXED TABLE NAME) ----------------------
 app.post('/admin/register', async (req, res) => {
   const { email, password } = req.body;
   const hashed = await bcrypt.hash(password, 10);
 
-  db.query("INSERT INTO admin (email, password) VALUES (?, ?)",
+  // FIX: Mengubah tabel dari `admin` menjadi `admins`
+  db.query("INSERT INTO admins (email, password) VALUES (?, ?)",
     [email, hashed],
     (err) => {
-      if (err) return res.json({ success: false, message: "Admin sudah ada!" });
+      // Perbaikan: Menambahkan cek error spesifik untuk email duplikat
+      if (err && err.code === 'ER_DUP_ENTRY') { 
+        return res.json({ success: false, message: "Email Admin sudah terdaftar!" }); 
+      } else if (err) {
+        console.error("Error Register Admin:", err);
+        return res.status(500).json({ success: false, message: "Pendaftaran gagal. Cek koneksi DB/tabel." });
+      }
       res.json({ success: true, message: "Admin berhasil dibuat!" });
     });
 });
 
-// ---------------------- ADMIN LOGIN ----------------------
+// ---------------------- ADMIN LOGIN (FIXED TABLE NAME) ----------------------
 app.post('/admin/login', (req, res) => {
   const { email, password } = req.body;
 
-  db.query("SELECT * FROM admin WHERE email = ?", [email], async (err, result) => {
-    if (err || result.length === 0) {
+  // FIX: Mengubah tabel dari `admin` menjadi `admins`
+  db.query("SELECT * FROM admins WHERE email = ?", [email], async (err, result) => {
+    if (err) {
+      console.error("Error Login Admin:", err);
+      return res.status(500).json({ success: false, message: "Terjadi kesalahan server saat login." });
+    }
+    
+    if (result.length === 0) {
       return res.json({ success: false, message: "Admin tidak ditemukan!" });
     }
 
